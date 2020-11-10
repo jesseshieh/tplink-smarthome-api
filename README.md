@@ -1,3 +1,14 @@
+To listen and a port and control a smart plug, use
+```bash
+socat -u tcp-l:7777,fork system:'read MESSAGE && tplink-smarthome-api setPowerState 10.0.1.5 $MESSAGE'
+```
+
+Test with
+```bash
+echo "true" | netcat localhost 7777
+echo "false" | netcat localhost 7777
+```
+
 <!-- markdownlint-disable MD007 MD012 MD033 -->
 
 # tplink-smarthome-api
