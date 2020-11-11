@@ -3,7 +3,8 @@ To listen and a port and control a smart plug, use
 socat -u tcp-l:7777,fork system:'read MESSAGE && tplink-smarthome-api setPowerState 10.0.1.5 $MESSAGE'
 ```
 
-Test with
+Test with (but netcat is buggy so it closes connection prematurely and server reports broken pipe) 
+But it works from the arduino.. weird.
 ```bash
 echo "true" | netcat localhost 7777
 echo "false" | netcat localhost 7777
