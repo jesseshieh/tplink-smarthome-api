@@ -9,9 +9,13 @@
 
 #define TEMP_PIN A0
 // D4 is used by built-in LED?
+// D5 and D3 also didn't work? why?
 #define BUTTON_PIN D1
+#define REFRESH_INTERVAL 60
 
 #define THRESHOLD_TEMP 75
+#define OFFSET -4 // feels hacky, but I guess this is how calibration is done?
+
 #define SERVER_IP "TODO"
 #define SERVER_PORT 7777
 
@@ -21,7 +25,7 @@
 #endif
 
 volatile bool enabled = true;
-volatile byte interruptCounter = 0;
+unsigned int loopCounter = 0;
 
 void setupLcd() {
 //  lcd.init(); // initialize the lcd
@@ -43,7 +47,6 @@ void setupWifi() {
 
 ICACHE_RAM_ATTR void handleButton() {
   enabled = !enabled;
-  interruptCounter++;
 }
 
 void setup()
@@ -153,39 +156,44 @@ float currentTemp(int tempPin) {
 
 void loop()
 { 
-  int offset = -4; // feels hacky, but I guess this is how calibration is done?
-  double tempF = currentTemp(TEMP_PIN) + offset;
-  Serial.println((String)"tempF: " + tempF);
-  logTemp(tempF);
-  // updateLcd(tempF);
-
+  loopCounter++;
+  Serial.println("loopCounter: " + (String)loopCounter);
   Serial.println("enabled: " + (String)enabled);
-  Serial.println("interruptCounter: " + (String)interruptCounter);
-  if (enabled) {
-    int state = getPowerState();
   
-    if (tempF < THRESHOLD_TEMP) {
-      if (state == 0) {
-        setPowerState(true); 
-      } else {
-        Serial.println("power already on");
-      }
-    } else {
-      if (state == 1) {
-        setPowerState(false);
-      } else {
-        Serial.println("power already off");
-      }
-    }
+  if (enabled) {
     digitalWrite(LED_BUILTIN, LOW);
   } else {
-    
-    Serial.println("press button to enable");
     digitalWrite(LED_BUILTIN, HIGH);
   }
   
+  if (loopCounter >= REFRESH_INTERVAL) {
+    loopCounter = 0;
+    double tempF = currentTemp(TEMP_PIN) + OFFSET;
+    Serial.println("temp: " + (String)tempF + "F");
+    logTemp(tempF);
+    // updateLcd(tempF);
   
-
-  delay(1000*60);
-  
+    if (enabled) {
+      int state = getPowerState();
+    
+      if (tempF < THRESHOLD_TEMP) {
+        if (state == 0) {
+          setPowerState(true); 
+          Serial.println("powering on");
+        } else {
+          Serial.println("power already on");
+        }
+      } else {
+        if (state == 1) {
+          setPowerState(false);
+          Serial.println("powering off");
+        } else {
+          Serial.println("power already off");
+        }
+      }
+    } else {
+      Serial.println("press button to enable");
+    } 
+  }
+  delay(1000); 
 }
