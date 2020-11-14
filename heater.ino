@@ -1,12 +1,15 @@
 #include <Wire.h>
 //#include <LiquidCrystal_I2C.h>
 #include <ESP8266WiFi.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
 //LiquidCrystal_I2C lcd(0x27,16,2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 
 
 // nest 76 is  81.85 here
 
+#define DEV false
 #define TEMP_PIN A0
 // D4 is used by built-in LED?
 // D5 and D3 also didn't work? why?
@@ -26,6 +29,11 @@
 
 volatile bool enabled = true;
 unsigned int loopCounter = 0;
+
+WiFiUDP ntpUDP;
+
+// handle daylight saving time?
+NTPClient timeClient(ntpUDP, -8 * 60 * 60);
 
 void setupLcd() {
 //  lcd.init(); // initialize the lcd
@@ -47,6 +55,11 @@ void setupWifi() {
 
 ICACHE_RAM_ATTR void handleButton() {
   enabled = !enabled;
+  if (enabled) {
+    // make it more responsive. when you turn it on
+    // don't make them wait 60s to get heat
+    loopCounter = REFRESH_INTERVAL;
+  }
 }
 
 void setup()
@@ -57,13 +70,23 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), handleButton, RISING);
+
+  // right when you plug it in, don't make them wait to 60s to get
+  // heat
+  loopCounter = REFRESH_INTERVAL;
+
+  timeClient.begin();
 }
 
 void setPowerState(boolean state) {
-  if (state) {
-    sendCommand("true");
+  if (DEV) {
+    Serial.println("DEV mode. Skipping setPowerState");
   } else {
-    sendCommand("false");
+    if (state) {
+      sendCommand("true");
+    } else {
+      sendCommand("false");
+    }
   }
 }
 
@@ -165,7 +188,17 @@ void loop()
   } else {
     digitalWrite(LED_BUILTIN, HIGH);
   }
+
+  timeClient.update();
   
+  // turn off the heater automatically in the morning.
+  // it's okay to be cold if nobody is in the room
+  // but allow the user to override this.
+  if (timeClient.getHours() == 10 && timeClient.getMinutes() == 0 && enabled) {
+    Serial.println("disabling at 10am");
+    enabled = false;
+  }
+
   if (loopCounter >= REFRESH_INTERVAL) {
     loopCounter = 0;
     double tempF = currentTemp(TEMP_PIN) + OFFSET;
