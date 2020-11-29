@@ -193,10 +193,17 @@ void loop()
   
   // turn off the heater automatically in the morning.
   // it's okay to be cold if nobody is in the room
-  // but allow the user to override this.
+  // but allow the user to override this starting at 10:01
   if (timeClient.getHours() == 10 && timeClient.getMinutes() == 0 && enabled) {
     Serial.println("disabling at 10am");
+    setPowerState(false);
     enabled = false;
+  }
+
+  // turn on automatically at 9pm
+  if (timeClient.getHours() == 21 && timeClient.getMinutes() == 0 && !enabled) {
+    Serial.println("enabling at 9pm");
+    enabled = true;
   }
 
   if (loopCounter >= REFRESH_INTERVAL) {
@@ -205,7 +212,14 @@ void loop()
     Serial.println("temp: " + (String)tempF + "F");
     logTemp(tempF);
     // updateLcd(tempF);
-  
+
+    // check for crazy temps, such as when a wire was unplugged the temp
+    // was -479
+    if (tempF < 0 && enabled) {
+      // better to get too cold, than too hot
+      enabled = false;
+    }
+
     if (enabled) {
       int state = getPowerState();
     
